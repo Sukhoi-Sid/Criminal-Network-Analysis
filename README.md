@@ -39,4 +39,4 @@ The system supports investigators. It does not replace investigative or legal de
 | Phase | Status |
 |---|---|
 | Design (Architecture + Blueprint) | ✅ Frozen |
-| Phase 1 — Foundation & Secure Case System | 🔲 Not started |
+| Phase 1 — Foundation & Secure Case System | 🟡 Implemented, unverified in this sandbox — see [docs/implementation/PHASE-1-STATUS.md](./docs/implementation/PHASE-1-STATUS.md) |

@@ -1,0 +1,234 @@
+// SIH 26189 – Criminal | Phase 1 schema
+// Source of truth: docs/implementation/IMPLEMENTATION-BLUEPRINT.md (§4, §5)
+// Storage rule: PostgreSQL = operational + metadata. Evidence blob content lives on
+// the filesystem (EVIDENCE_STORAGE_PATH); this schema stores only the index/metadata,
+// per "Evidence Index" row in the Data Storage Responsibilities table.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Auth ────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  investigator
+  supervisor
+  auditor
+  admin
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         UserRole
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  createdCases      Case[]           @relation("CaseCreatedBy")
+  caseAssignments   CaseAssignment[]
+  uploadedDocuments Document[]
+  auditEvents       AuditEvent[]
+  provenanceReceipts Provenance[]
+
+  @@map("users")
+}
+
+// ─── Case Platform (Phase 1) ───────────────────────────────────────────────
+
+enum CaseStatus {
+  open
+  active
+  on_hold
+  closed
+}
+
+enum CaseClassification {
+  restricted
+  confidential
+  secret
+}
+
+enum CaseAssignmentRole {
+  investigator
+  supervisor
+}
+
+model Case {
+  id              String             @id @default(uuid())
+  caseId          String             @unique // human-readable ref, e.g. REF-2026-001
+  title           String
+  description     String?
+  status          CaseStatus         @default(open)
+  classification  CaseClassification @default(restricted)
+  jurisdiction    String?
+  contextSummary  String?
+  createdById     String
+  createdBy       User               @relation("CaseCreatedBy", fields: [createdById], references: [id])
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  assignments          CaseAssignment[]
+  intelligenceState    CaseIntelligenceState?
+  documents            Document[]
+  evidenceRecords      EvidenceRecord[]
+  auditEvents          AuditEvent[]
+
+  @@map("cases")
+}
+
+model CaseAssignment {
+  id        String             @id @default(uuid())
+  caseId    String
+  case      Case               @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User               @relation(fields: [userId], references: [id])
+  role      CaseAssignmentRole
+  createdAt DateTime           @default(now())
+
+  @@unique([caseId, userId])
+  @@map("case_assignments")
+}
+
+// Versioned, evolving summary of what the case "knows" so far. Owned by
+// case-platform (blueprint §3). Body is a free-form JSON snapshot in Phase 1;
+// later phases (brain, entity-resolution) write structured updates into it.
+model CaseIntelligenceState {
+  id        String   @id @default(uuid())
+  caseId    String   @unique
+  case      Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  version   Int      @default(1)
+  summary   Json     @default("{}")
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@map("case_intelligence_states")
+}
+
+// ─── Audit (cross-cutting, append-only) ────────────────────────────────────
+
+enum AuditAction {
+  login
+  logout
+  login_failed
+  case_create
+  case_read
+  case_update
+  case_assign
+  evidence_document_create
+  evidence_document_read
+  user_create
+  user_update
+  audit_read
+  access_denied
+}
+
+enum AuditResourceType {
+  user
+  case
+  document
+  evidence
+  audit
+  session
+}
+
+model AuditEvent {
+  id           String             @id @default(uuid())
+  actorId      String?
+  actor        User?              @relation(fields: [actorId], references: [id])
+  actorEmail   String?
+  action       AuditAction
+  resourceType AuditResourceType
+  resourceId   String?
+  caseId       String?
+  case         Case?              @relation(fields: [caseId], references: [id])
+  metadata     Json?
+  ipAddress    String?
+  createdAt    DateTime           @default(now())
+
+  @@index([caseId])
+  @@index([actorId])
+  @@index([action])
+  @@map("audit_events")
+}
+
+// ─── Evidence Store (skeleton — source of truth per SOURCE-OF-TRUTH.md #1) ─
+
+enum EvidenceSourceType {
+  fir_upload
+  report_upload
+  attachment
+  external_package
+}
+
+enum ReliabilityTier {
+  tier1_authoritative
+  tier2_operational
+  tier3_derived
+  tier4_unverified
+}
+
+// Metadata/index record for an uploaded file. The blob itself is written to
+// EVIDENCE_STORAGE_PATH on disk; only its pointer + hash live here.
+model Document {
+  id              String             @id @default(uuid())
+  caseId          String
+  case            Case               @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  filename        String
+  mimeType        String
+  contentHash     String
+  blobPath        String
+  sizeBytes       Int
+  sourceType      EvidenceSourceType
+  uploadedById    String
+  uploadedBy      User               @relation(fields: [uploadedById], references: [id])
+  createdAt       DateTime           @default(now())
+
+  evidenceRecords EvidenceRecord[]
+
+  @@index([caseId])
+  @@map("documents")
+}
+
+model EvidenceRecord {
+  id               String             @id @default(uuid())
+  caseId           String
+  case             Case               @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  documentId       String?
+  document         Document?          @relation(fields: [documentId], references: [id])
+  sourceType       EvidenceSourceType
+  sourceRecordId   String
+  reliabilityTier  ReliabilityTier    @default(tier1_authoritative)
+  contentHash      String
+  createdAt        DateTime           @default(now())
+
+  provenance       Provenance?
+
+  @@index([caseId])
+  @@map("evidence_records")
+}
+
+// One provenance record per evidence item, per Blueprint §9:
+// originSource, receivedAt, receivedBy, transformationChain[], parentEvidenceId,
+// contentHash, optional integrityAnchorId (integrity module lands in Phase 9).
+model Provenance {
+  id                   String          @id @default(uuid())
+  evidenceRecordId     String          @unique
+  evidenceRecord       EvidenceRecord  @relation(fields: [evidenceRecordId], references: [id], onDelete: Cascade)
+  originSource         String
+  receivedAt           DateTime        @default(now())
+  receivedById         String
+  receivedBy           User            @relation(fields: [receivedById], references: [id])
+  transformationChain  Json            @default("[]")
+  parentEvidenceId     String?
+  contentHash          String
+  integrityAnchorId    String?
+
+  @@map("provenance_records")
+}

@@ -2,7 +2,7 @@
   "name": "sih-26189-criminal",
   "version": "0.1.0",
   "private": true,
-  "description": "SIH 26189 – Criminal: AI-driven Investigative Intelligence System",
+  "description": "SIH 26189 \u2013 Criminal: AI-driven Investigative Intelligence System",
   "scripts": {
     "dev": "concurrently \"pnpm --filter @sih/api dev\" \"pnpm --filter @sih/web dev\"",
     "build": "pnpm --filter @sih/shared build && pnpm --filter @sih/api build && pnpm --filter @sih/web build",
