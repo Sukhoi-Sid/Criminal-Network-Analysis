@@ -31,11 +31,15 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  createdCases      Case[]           @relation("CaseCreatedBy")
-  caseAssignments   CaseAssignment[]
-  uploadedDocuments Document[]
-  auditEvents       AuditEvent[]
+  createdCases       Case[]                      @relation("CaseCreatedBy")
+  caseAssignments    CaseAssignment[]
+  uploadedDocuments  Document[]
+  auditEvents        AuditEvent[]
   provenanceReceipts Provenance[]
+  gapReviews         IntelligenceGap[]           @relation("GapReviewer")
+  createdRequests    IntelligenceRequest[]       @relation("RequestCreator")
+  authorizations     IntelligenceAuthorization[]
+  requestTransitions IntelligenceTransition[]
 
   @@map("users")
 }
@@ -61,18 +65,18 @@ enum CaseAssignmentRole {
 }
 
 model Case {
-  id              String             @id @default(uuid())
-  caseId          String             @unique // human-readable ref, e.g. REF-2026-001
-  title           String
-  description     String?
-  status          CaseStatus         @default(open)
-  classification  CaseClassification @default(restricted)
-  jurisdiction    String?
-  contextSummary  String?
-  createdById     String
-  createdBy       User               @relation("CaseCreatedBy", fields: [createdById], references: [id])
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  id             String             @id @default(uuid())
+  caseId         String             @unique // human-readable ref, e.g. REF-2026-001
+  title          String
+  description    String?
+  status         CaseStatus         @default(open)
+  classification CaseClassification @default(restricted)
+  jurisdiction   String?
+  contextSummary String?
+  createdById    String
+  createdBy      User               @relation("CaseCreatedBy", fields: [createdById], references: [id])
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
 
   assignments          CaseAssignment[]
   intelligenceState    CaseIntelligenceState?
@@ -80,6 +84,9 @@ model Case {
   evidenceRecords      EvidenceRecord[]
   mentions             Mention[]
   auditEvents          AuditEvent[]
+  contextAnalysis      CaseContextAnalysis?
+  intelligenceGaps     IntelligenceGap[]
+  intelligenceRequests IntelligenceRequest[]
 
   @@map("cases")
 }
@@ -129,6 +136,11 @@ enum AuditAction {
   user_update
   audit_read
   access_denied
+  intelligence_analyze
+  intelligence_read
+  intelligence_review
+  intelligence_request_create
+  intelligence_transition
 }
 
 enum AuditResourceType {
@@ -138,21 +150,23 @@ enum AuditResourceType {
   evidence
   audit
   session
+  intelligence_gap
+  intelligence_request
 }
 
 model AuditEvent {
-  id           String             @id @default(uuid())
+  id           String            @id @default(uuid())
   actorId      String?
-  actor        User?              @relation(fields: [actorId], references: [id])
+  actor        User?             @relation(fields: [actorId], references: [id])
   actorEmail   String?
   action       AuditAction
   resourceType AuditResourceType
   resourceId   String?
   caseId       String?
-  case         Case?              @relation(fields: [caseId], references: [id])
+  case         Case?             @relation(fields: [caseId], references: [id])
   metadata     Json?
   ipAddress    String?
-  createdAt    DateTime           @default(now())
+  createdAt    DateTime          @default(now())
 
   @@index([caseId])
   @@index([actorId])
@@ -179,18 +193,18 @@ enum ReliabilityTier {
 // Metadata/index record for an uploaded file. The blob itself is written to
 // EVIDENCE_STORAGE_PATH on disk; only its pointer + hash live here.
 model Document {
-  id              String             @id @default(uuid())
-  caseId          String
-  case            Case               @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  filename        String
-  mimeType        String
-  contentHash     String
-  blobPath        String
-  sizeBytes       Int
-  sourceType      EvidenceSourceType
-  uploadedById    String
-  uploadedBy      User               @relation(fields: [uploadedById], references: [id])
-  createdAt       DateTime           @default(now())
+  id           String             @id @default(uuid())
+  caseId       String
+  case         Case               @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  filename     String
+  mimeType     String
+  contentHash  String
+  blobPath     String
+  sizeBytes    Int
+  sourceType   EvidenceSourceType
+  uploadedById String
+  uploadedBy   User               @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime           @default(now())
 
   // Phase 2 — document-intelligence processing state. Lives on Document
   // (not a separate 1:1 table) since it's simple per-document state, not an
@@ -198,28 +212,32 @@ model Document {
   processingStatus DocumentProcessingStatus @default(pending)
   processingError  String?
   processedAt      DateTime?
+  extractedPages   Json?
 
   evidenceRecords EvidenceRecord[]
   mentions        Mention[]
+  gapOrigins      IntelligenceGapOrigin[]
 
   @@index([caseId])
   @@map("documents")
 }
 
 model EvidenceRecord {
-  id               String             @id @default(uuid())
-  caseId           String
-  case             Case               @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  documentId       String?
-  document         Document?          @relation(fields: [documentId], references: [id])
-  sourceType       EvidenceSourceType
-  sourceRecordId   String
-  reliabilityTier  ReliabilityTier    @default(tier1_authoritative)
-  contentHash      String
-  createdAt        DateTime           @default(now())
+  id              String             @id @default(uuid())
+  caseId          String
+  case            Case               @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  documentId      String?
+  document        Document?          @relation(fields: [documentId], references: [id])
+  sourceType      EvidenceSourceType
+  sourceRecordId  String
+  reliabilityTier ReliabilityTier    @default(tier1_authoritative)
+  contentHash     String
+  createdAt       DateTime           @default(now())
 
-  provenance       Provenance?
-  mentions         Mention[]
+  provenance           Provenance?
+  mentions             Mention[]
+  gapOrigins           IntelligenceGapOrigin[]
+  intelligenceResponse IntelligenceResponse?
 
   @@index([caseId])
   @@map("evidence_records")
@@ -229,17 +247,17 @@ model EvidenceRecord {
 // originSource, receivedAt, receivedBy, transformationChain[], parentEvidenceId,
 // contentHash, optional integrityAnchorId (integrity module lands in Phase 9).
 model Provenance {
-  id                   String          @id @default(uuid())
-  evidenceRecordId     String          @unique
-  evidenceRecord       EvidenceRecord  @relation(fields: [evidenceRecordId], references: [id], onDelete: Cascade)
-  originSource         String
-  receivedAt           DateTime        @default(now())
-  receivedById         String
-  receivedBy           User            @relation(fields: [receivedById], references: [id])
-  transformationChain  Json            @default("[]")
-  parentEvidenceId     String?
-  contentHash          String
-  integrityAnchorId    String?
+  id                  String         @id @default(uuid())
+  evidenceRecordId    String         @unique
+  evidenceRecord      EvidenceRecord @relation(fields: [evidenceRecordId], references: [id], onDelete: Cascade)
+  originSource        String
+  receivedAt          DateTime       @default(now())
+  receivedById        String
+  receivedBy          User           @relation(fields: [receivedById], references: [id])
+  transformationChain Json           @default("[]")
+  parentEvidenceId    String?
+  contentHash         String
+  integrityAnchorId   String?
 
   @@map("provenance_records")
 }
@@ -276,13 +294,13 @@ enum ExtractionMethod {
 // for cheap case-scoped queries/ABAC without an extra join, matching the
 // same pattern already used on EvidenceRecord/AuditEvent.
 model Mention {
-  id               String            @id @default(uuid())
+  id               String          @id @default(uuid())
   caseId           String
-  case             Case              @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  case             Case            @relation(fields: [caseId], references: [id], onDelete: Cascade)
   documentId       String
-  document         Document          @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  document         Document        @relation(fields: [documentId], references: [id], onDelete: Cascade)
   evidenceRecordId String?
-  evidenceRecord   EvidenceRecord?   @relation(fields: [evidenceRecordId], references: [id])
+  evidenceRecord   EvidenceRecord? @relation(fields: [evidenceRecordId], references: [id])
 
   mentionType      MentionType
   text             String
@@ -291,11 +309,186 @@ model Mention {
   pageNumber       Int?
   startOffset      Int?
   endOffset        Int?
-  extractionMethod ExtractionMethod  @default(regex)
-  extractedAt      DateTime          @default(now())
+  extractionMethod ExtractionMethod        @default(regex)
+  extractedAt      DateTime                @default(now())
+  gapOrigins       IntelligenceGapOrigin[]
 
   @@index([caseId])
   @@index([documentId])
   @@index([mentionType])
   @@map("mentions")
+}
+
+// Phase 3: derived requirements, immutable request scope and synthetic receipts.
+// CaseClassification above remains the security classification, not crime type.
+enum IntelligenceGapStatus {
+  OPEN
+  REVIEWED
+  DISMISSED
+  REQUESTED
+  RESOLVED
+  STALE
+}
+
+enum IntelligencePriority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum IntelligenceRequestStatus {
+  DRAFT
+  SUBMITTED
+  PENDING_AUTHORIZATION
+  AUTHORIZED
+  REJECTED
+  DISPATCHED
+  RECEIVED
+  COMPLETED
+  FAILED
+}
+
+model CaseContextAnalysis {
+  id              String   @id @default(uuid())
+  caseId          String   @unique
+  case            Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  caseType        String
+  contextHash     String
+  registryVersion String
+  rationale       Json
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("case_context_analyses")
+}
+
+model IntelligenceSource {
+  id         String                @id
+  department String
+  category   String
+  permission String
+  synthetic  Boolean               @default(true)
+  gaps       IntelligenceGap[]
+  requests   IntelligenceRequest[]
+
+  @@map("intelligence_sources")
+}
+
+model IntelligenceGap {
+  id             String                  @id @default(uuid())
+  caseId         String
+  case           Case                    @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  caseType       String
+  ruleId         String
+  fingerprint    String
+  contextHash    String
+  requiredData   String
+  targetType     String
+  targetEntity   String
+  sourceId       String
+  source         IntelligenceSource      @relation(fields: [sourceId], references: [id])
+  timeFrom       DateTime
+  timeTo         DateTime
+  purpose        String
+  priority       IntelligencePriority
+  priorityReason String
+  explanation    String
+  status         IntelligenceGapStatus   @default(OPEN)
+  reviewedById   String?
+  reviewedBy     User?                   @relation("GapReviewer", fields: [reviewedById], references: [id])
+  reviewedAt     DateTime?
+  reviewNote     String?
+  origins        IntelligenceGapOrigin[]
+  request        IntelligenceRequest?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  @@unique([caseId, fingerprint])
+  @@unique([id, caseId])
+  @@index([caseId, status])
+  @@map("intelligence_gaps")
+}
+
+model IntelligenceGapOrigin {
+  id               String          @id @default(uuid())
+  gapId            String
+  gap              IntelligenceGap @relation(fields: [gapId], references: [id], onDelete: Cascade)
+  documentId       String
+  document         Document        @relation(fields: [documentId], references: [id])
+  evidenceRecordId String?
+  evidenceRecord   EvidenceRecord? @relation(fields: [evidenceRecordId], references: [id])
+  mentionId        String?
+  mention          Mention?        @relation(fields: [mentionId], references: [id], onDelete: SetNull)
+  // Immutable span snapshot preserves lineage when Phase 2 force-replaces mentions.
+  snapshot         Json
+
+  @@index([gapId])
+  @@map("intelligence_gap_origins")
+}
+
+model IntelligenceRequest {
+  id            String                     @id @default(uuid())
+  caseId        String
+  case          Case                       @relation(fields: [caseId], references: [id])
+  gapId         String                     @unique
+  gap           IntelligenceGap            @relation(fields: [gapId, caseId], references: [id, caseId])
+  sourceId      String
+  source        IntelligenceSource         @relation(fields: [sourceId], references: [id])
+  // Server-created, immutable copy of reviewed scope and evidence references.
+  scope         Json
+  status        IntelligenceRequestStatus  @default(DRAFT)
+  createdById   String
+  createdBy     User                       @relation("RequestCreator", fields: [createdById], references: [id])
+  authorization IntelligenceAuthorization?
+  response      IntelligenceResponse?
+  transitions   IntelligenceTransition[]
+  failureReason String?
+  createdAt     DateTime                   @default(now())
+  updatedAt     DateTime                   @updatedAt
+
+  @@unique([gapId, caseId])
+  @@index([caseId, status])
+  @@map("intelligence_requests")
+}
+
+model IntelligenceAuthorization {
+  id             String              @id @default(uuid())
+  requestId      String              @unique
+  request        IntelligenceRequest @relation(fields: [requestId], references: [id])
+  authorizedById String
+  authorizedBy   User                @relation(fields: [authorizedById], references: [id])
+  approved       Boolean
+  reason         String
+  createdAt      DateTime            @default(now())
+
+  @@map("intelligence_authorizations")
+}
+
+model IntelligenceResponse {
+  id               String              @id @default(uuid())
+  requestId        String              @unique
+  request          IntelligenceRequest @relation(fields: [requestId], references: [id])
+  evidenceRecordId String              @unique
+  evidenceRecord   EvidenceRecord      @relation(fields: [evidenceRecordId], references: [id])
+  receiptKey       String              @unique
+  retrievedAt      DateTime            @default(now())
+
+  @@map("intelligence_responses")
+}
+
+model IntelligenceTransition {
+  sequence    Int                        @unique @default(autoincrement())
+  id          String                     @id @default(uuid())
+  requestId   String
+  request     IntelligenceRequest        @relation(fields: [requestId], references: [id])
+  actorId     String
+  actor       User                       @relation(fields: [actorId], references: [id])
+  fromStatus  IntelligenceRequestStatus?
+  toStatus    IntelligenceRequestStatus
+  eventType   String
+  publishedAt DateTime?
+  createdAt   DateTime                   @default(now())
+
+  @@index([requestId, createdAt])
+  @@map("intelligence_transitions")
 }

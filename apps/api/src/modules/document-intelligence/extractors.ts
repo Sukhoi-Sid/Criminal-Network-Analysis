@@ -52,6 +52,12 @@ const DATE_NUMERIC: Matcher = {
   regex: /\b\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}\b/g,
 };
 
+const DATE_ISO: Matcher = {
+  mentionType: MentionType.DATE,
+  confidence: 0.85,
+  regex: /\b\d{4}-\d{2}-\d{2}\b/g,
+};
+
 const MONTHS =
   'January|February|March|April|May|June|July|August|September|October|November|December';
 const MONTH_INDEX: Record<string, string> = {
@@ -142,6 +148,7 @@ const MATCHERS: Matcher[] = [
   PHONE,
   VEHICLE,
   DATE_TEXTUAL,
+  DATE_ISO,
   DATE_NUMERIC,
   MONEY,
   FINANCIAL_IDENTIFIER,

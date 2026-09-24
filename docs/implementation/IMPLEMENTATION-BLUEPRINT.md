@@ -239,6 +239,20 @@ IBrainPipeline
 
 ## 8. Intelligence Request & Mock External-Source Interface
 
+**Phase 3 implementation update (2026-09-17):** The user-authorized case-type registry and requirement engine
+are implemented within `intelligence-requirements`. The original conceptual lifecycle below maps to
+`DRAFT → SUBMITTED → PENDING_AUTHORIZATION → AUTHORIZED → DISPATCHED → RECEIVED → COMPLETED`,
+with `REJECTED` and retriable `FAILED` outcomes. Here SUBMITTED means submitted for internal approval;
+DISPATCHED means submitted to a source. Both SUBMITTED and DISPATCHED are recorded in durable history.
+Supervisor approval, source permissions, assignment-scoped access and provenance remain mandatory.
+See [Phase 3 status](PHASE-3-STATUS.md) for implemented contracts, relevance rules and verification.
+
+Case context is classified by registry signals. Requirements require a target justified by its local source text,
+an explicit incident/transaction date window, a mapped source and an investigative purpose. Rules supply
+explainable priority and scope limits. Review creates an immutable formal request; a changed context creates
+new versioned gap suggestions and cannot silently alter an existing authorization. The six synthetic categories
+are financial, telecom, criminal-history, vehicle, CCTV/location, and cyber. Receipt is owned by evidence-store.
+
 ### Request State Machine
 
 ```

@@ -69,13 +69,22 @@ class PdfTextProcessor implements IDocumentProcessor {
     // capturing text there is how we preserve page numbers (D7: "preserve
     // page information where possible"), since the default `.text` output
     // is the whole document concatenated with no page boundaries.
-    const result = await pdfParse(buffer, {
+    // PDF.js expects typed-array copy semantics; Node Buffer.slice() returns
+    // shared views and can corrupt its cross-reference parsing. Pass an owned
+    // Uint8Array. pdf-parse's old declarations incorrectly restrict this to Buffer.
+    const result = await pdfParse(new Uint8Array(buffer) as unknown as Buffer, {
       pagerender: async (pageData: {
-        getTextContent: () => Promise<{ items: Array<{ str: string }> }>;
+        getTextContent: () => Promise<{ items: Array<{ str: string; transform?: number[] }> }>;
         pageNumber: number;
       }) => {
         const content = await pageData.getTextContent();
-        const pageText = content.items.map((item) => item.str).join(' ');
+        let lastY: number | undefined;
+        const pageText = content.items.map((item, index) => {
+          const y = item.transform?.[5];
+          const separator = index === 0 ? '' : lastY !== undefined && y !== undefined && y !== lastY ? '\n' : ' ';
+          lastY = y;
+          return separator + item.str;
+        }).join('');
         pages.push({ pageNumber: pageData.pageNumber, text: pageText });
         return pageText;
       },

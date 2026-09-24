@@ -2,6 +2,7 @@ import { eventBus, type DomainEvent } from '../../core/domain-events';
 import { prisma } from '../../core/db';
 import { DocumentIntelligenceEvents } from '../document-intelligence/events';
 import type { ExtractionCompletedPayload } from '../document-intelligence/events';
+import { Prisma } from '@prisma/client';
 
 /**
  * `case-platform` owns `CaseIntelligenceState` (module ownership table,
@@ -51,7 +52,7 @@ export function registerCaseIntelligenceStateSubscriber(): void {
                 lastExtractedAt: new Date().toISOString(),
               },
             },
-          },
+          }as Prisma.InputJsonValue,
         },
       });
     },

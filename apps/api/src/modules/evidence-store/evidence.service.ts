@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile, readFile } from 'node:fs/promises';
+import type { Prisma } from '@prisma/client';
 import path from 'node:path';
 import {
   AuditAction,
@@ -36,6 +37,47 @@ export interface UploadDocumentInput {
  * raw file, per SOURCE-OF-TRUTH.md principle #1.
  */
 export class EvidenceStoreService {
+  /** Phase 3 uses the existing blob/evidence/provenance owner in the request transaction. */
+  async receiveExternalPackage(tx: Prisma.TransactionClient, input: {
+    caseId: string; requestId: string; sourceId: string; authorizationId: string;
+    actorId: string; payload: unknown; parentEvidenceId?: string; origins: unknown[];
+  }) {
+    const buffer = Buffer.from(JSON.stringify(input.payload));
+    const contentHash = this.hash(buffer);
+    const caseDir = path.join(env.EVIDENCE_STORAGE_PATH, input.caseId);
+    const blobPath = path.join(caseDir, `${input.requestId}-${contentHash}.json`);
+    await mkdir(caseDir, { recursive: true });
+    try { await writeFile(blobPath, buffer, { flag: 'wx' }); }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST' || this.hash(await readFile(blobPath)) !== contentHash) {
+        throw new FileError('Unable to persist external package');
+      }
+    }
+    const document = await tx.document.create({ data: {
+      caseId: input.caseId, filename: `synthetic-${input.requestId}.json`, mimeType: 'application/json',
+      blobPath, sizeBytes: buffer.length, contentHash, sourceType: 'external_package', uploadedById: input.actorId,
+    } });
+    return tx.evidenceRecord.create({ data: {
+      caseId: input.caseId, documentId: document.id, sourceType: 'external_package',
+      sourceRecordId: input.requestId, contentHash, reliabilityTier: 'tier4_unverified',
+      provenance: { create: {
+        originSource: input.sourceId, receivedById: input.actorId, contentHash,
+        parentEvidenceId: input.parentEvidenceId,
+        transformationChain: [{ step: 'synthetic_source_receipt', requestId: input.requestId,
+          authorizationId: input.authorizationId, synthetic: true, origins: input.origins }] as Prisma.InputJsonValue,
+      } },
+    }, include: { provenance: true } });
+  }
+
+  async readExternalPackage(record: { contentHash: string; document: { blobPath: string } | null }) {
+    if (!record.document) throw new FileError('External package missing');
+    let buffer: Buffer;
+    try { buffer = await readFile(record.document.blobPath); }
+    catch { throw new FileError('External package unavailable'); }
+    if (this.hash(buffer) !== record.contentHash) throw new FileError('External package integrity mismatch');
+    return JSON.parse(buffer.toString('utf8')) as unknown;
+  }
+
   private hash(buffer: Buffer): string {
     return createHash('sha256').update(buffer).digest('hex');
   }

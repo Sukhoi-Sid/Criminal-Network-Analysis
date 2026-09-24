@@ -46,7 +46,7 @@ evidenceRouter.post(
     const sourceType = sourceTypeSchema.parse(req.body?.sourceType);
 
     const { document } = await evidenceStoreService.uploadDocument({
-      caseId: req.params.caseId,
+      caseId: String(req.params.caseId),
       filename: req.file.originalname,
       mimeType: req.file.mimetype,
       buffer: req.file.buffer,
@@ -66,7 +66,7 @@ evidenceRouter.get(
   requirePermission(Permission.EVIDENCE_READ),
   requireCaseAccess,
   async (req, res) => {
-    const documents = await evidenceStoreService.listDocumentsForCase(req.params.caseId);
+    const documents = await evidenceStoreService.listDocumentsForCase(String(req.params.caseId));
     const response: PaginatedResponse<DocumentDto> = {
       items: documents.map(toDocumentDto),
       total: documents.length,
@@ -84,7 +84,7 @@ evidenceRouter.get(
 // knows its caseId. See evidence.service.ts for the enforcement.
 evidenceRouter.get('/documents/:documentId', requirePermission(Permission.EVIDENCE_READ), async (req, res) => {
   const document = await evidenceStoreService.getDocument(
-    req.params.documentId,
+    String(req.params.documentId),
     { id: req.user!.id, email: req.user!.email },
     req.ip,
   );
@@ -99,7 +99,7 @@ evidenceRouter.get(
   requirePermission(Permission.EVIDENCE_READ),
   async (req, res) => {
     const record = await evidenceStoreService.getEvidenceRecord(
-      req.params.evidenceRecordId,
+      String(req.params.evidenceRecordId),
       { id: req.user!.id, email: req.user!.email },
       req.ip,
     );

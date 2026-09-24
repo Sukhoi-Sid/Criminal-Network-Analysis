@@ -53,7 +53,7 @@ caseRouter.get(
   requirePermission(Permission.CASE_READ),
   requireCaseAccess,
   async (req, res) => {
-    const kase = await caseService.getById(req.params.caseId);
+    const kase = await caseService.getById(String(req.params.caseId));
     await caseService.recordRead(kase.id, { id: req.user!.id, email: req.user!.email }, req.ip);
     const dto: CaseDto = toCaseDto(kase);
     res.status(200).json(dto);
@@ -76,7 +76,7 @@ caseRouter.patch(
   async (req, res) => {
     const body = updateCaseSchema.parse(req.body);
     const updated = await caseService.update(
-      req.params.caseId,
+     String(req.params.caseId),
       body,
       { id: req.user!.id, email: req.user!.email },
       req.ip,
@@ -98,7 +98,7 @@ caseRouter.post(
   async (req, res) => {
     const body = assignCaseSchema.parse(req.body);
     const assignment = await caseService.assign(
-      req.params.caseId,
+      String(req.params.caseId),
       body,
       { id: req.user!.id, email: req.user!.email },
       req.ip,

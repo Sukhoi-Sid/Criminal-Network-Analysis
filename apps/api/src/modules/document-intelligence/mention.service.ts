@@ -125,6 +125,7 @@ export class DocumentIntelligenceService {
           data: {
             processingStatus: DocumentProcessingStatus.COMPLETED as unknown as PrismaDocumentProcessingStatus,
             processedAt: new Date(),
+            extractedPages: extraction.pages.map(p => ({ pageNumber: p.pageNumber, text: p.text })),
             processingError: null,
           },
         });

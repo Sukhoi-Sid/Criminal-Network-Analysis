@@ -9,7 +9,18 @@ export const TEST_PASSWORD = 'Test-Passw0rd!';
  * integration tests, not unit tests with a mocked DB.
  */
 export async function resetDb(): Promise<void> {
+  if (process.env.NODE_ENV !== 'test' || !new URL(process.env.DATABASE_URL!).pathname.endsWith('_test')) {
+    throw new Error('Refusing to clear a non-test database');
+  }
   await prisma.$transaction([
+    prisma.intelligenceTransition.deleteMany(),
+    prisma.intelligenceResponse.deleteMany(),
+    prisma.intelligenceAuthorization.deleteMany(),
+    prisma.intelligenceRequest.deleteMany(),
+    prisma.intelligenceGapOrigin.deleteMany(),
+    prisma.intelligenceGap.deleteMany(),
+    prisma.caseContextAnalysis.deleteMany(),
+    prisma.intelligenceSource.deleteMany(),
     prisma.mention.deleteMany(),
     prisma.provenance.deleteMany(),
     prisma.evidenceRecord.deleteMany(),

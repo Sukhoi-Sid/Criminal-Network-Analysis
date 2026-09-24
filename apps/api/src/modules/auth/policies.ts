@@ -50,7 +50,7 @@ export async function requireCaseAccess(req: Request, _res: Response, next: Next
     throw new UnauthorizedError();
   }
 
-  const caseId = req.params.caseId ?? req.params.id;
+  const caseId = String(req.params.caseId) ?? req.params.id;
   if (!caseId) {
     throw new NotFoundError('Case id missing from request');
   }

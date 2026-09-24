@@ -80,7 +80,19 @@ Future implementations plug in without changing case platform or brain:
 
 ---
 
-## Change Control Process
+## D8 — Phase 3 case-type requirements (2026-09-17)
+
+Explicitly authorized by the Phase 3 task. Preserve the frozen modular-monolith boundaries and add a deterministic,
+configuration-driven registry in `intelligence-requirements/registry.ts`. Case types, source mappings, target constraints,
+scope limits, purposes and priorities live in the registry; the core engine has no case-type branches.
+
+Reuse Phase 2 extracted mentions and cached pages, Phase 1 RBAC/assignment ABAC, the existing event bus,
+audit service and evidence-store. A gap is derived context, not evidence or permission to fetch data.
+Only an independent, assigned supervisor can authorize a reviewed request. Mock data remains off-chain,
+marked synthetic and tier4/unverified. The user-approved lifecycle refinement and API are documented in
+[Phase 3 status](PHASE-3-STATUS.md); this leaves Phases 4–9 untouched.
+
+## Change control procedure
 
 1. Identify conflict with frozen blueprint or architecture
 2. Document impact on modules, storage, interfaces, MVP scope

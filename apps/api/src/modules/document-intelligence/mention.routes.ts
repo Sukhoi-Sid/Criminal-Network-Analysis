@@ -22,8 +22,8 @@ mentionRouter.post(
   async (req, res) => {
     const body = processBodySchema.parse(req.body ?? {});
     const result = await documentIntelligenceService.processDocument(
-      req.params.caseId,
-      req.params.documentId,
+      String(req.params.caseId),
+      String(req.params.documentId),
       { id: req.user!.id, email: req.user!.email },
       { force: body.force },
       req.ip,
@@ -43,7 +43,7 @@ mentionRouter.get(
   requirePermission(Permission.EVIDENCE_READ),
   requireCaseAccess,
   async (req, res) => {
-    const mentions = await documentIntelligenceService.listMentions(req.params.caseId, req.params.documentId, {
+    const mentions = await documentIntelligenceService.listMentions(String(req.params.caseId), String(req.params.documentId), {
       id: req.user!.id,
     });
 

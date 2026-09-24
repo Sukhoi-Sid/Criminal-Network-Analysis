@@ -82,6 +82,18 @@ If implementation requires a design change:
 
 ---
 
+## Current implementation (2026-09-17)
+
+Phases 1 and 2 were verified from the supplied ZIP against a clean PostgreSQL database: all 44 baseline tests passed.
+Phase 3 extends the existing modular monolith, shared permissions, in-process event bus and evidence/provenance store.
+The explicitly authorized Phase 3 addition is the configuration-driven case-type requirement engine; it does not add
+entity resolution, graph analytics, RAG, blockchain or the command-center frontend.
+
+- [Phase 1 status](implementation/PHASE-1-STATUS.md)
+- [Phase 2 status](implementation/PHASE-2-STATUS.md)
+- [Phase 3 implementation, API, demo and verification](implementation/PHASE-3-STATUS.md)
+- [D8 implementation decision](implementation/IMPLEMENTATION-DECISIONS.md#d8--phase-3-case-type-requirements-2026-09-17)
+
 ## Related
 
 - [Project README](../README.md) — high-level project overview

@@ -1,5 +1,13 @@
 # Phase 1 Status — Foundation & Secure Case System (FINAL)
 
+## Verification update — 2026-09-17
+
+The supplied Phase 2 ZIP was opened in the current workspace. Dependency installation,
+Prisma client generation, both existing migrations, schema validation and API/shared builds succeeded.
+All 31 Phase 1 tests passed against an isolated local PostgreSQL instance; the 13 Phase 2 tests also passed.
+Earlier sandbox limitations below are historical, not the current verification status.
+See [Phase 3 status](PHASE-3-STATUS.md) for the subsequent full regression run and additive changes.
+
 This supersedes the earlier draft of this file. Phase 1 went through two
 passes: an initial build, then a security-fix pass that closed the gaps
 found on review. This document reflects the final, fixed state as of the

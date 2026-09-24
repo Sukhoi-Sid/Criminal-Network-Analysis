@@ -4,13 +4,16 @@
   "private": true,
   "description": "SIH 26189 \u2013 Criminal: AI-driven Investigative Intelligence System",
   "scripts": {
-    "dev": "concurrently \"pnpm --filter @sih/api dev\" \"pnpm --filter @sih/web dev\"",
-    "build": "pnpm --filter @sih/shared build && pnpm --filter @sih/api build && pnpm --filter @sih/web build",
+    "dev": "pnpm --filter @sih/api dev",
+    "build": "pnpm --filter @sih/shared build && pnpm --filter @sih/api build",
+    "start": "pnpm --filter @sih/api start",
     "db:generate": "pnpm --filter @sih/api db:generate",
     "db:migrate": "pnpm --filter @sih/api db:migrate",
     "db:seed": "pnpm --filter @sih/api db:seed",
     "db:setup": "pnpm db:generate && pnpm db:migrate && pnpm db:seed",
-    "test": "pnpm --filter @sih/api test"
+    "test": "pnpm --filter @sih/shared build && pnpm --filter @sih/api test",
+    "typecheck": "pnpm --filter @sih/shared build && pnpm --filter @sih/api typecheck",
+    "demo:phase3": "pnpm --filter @sih/api demo:phase3"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

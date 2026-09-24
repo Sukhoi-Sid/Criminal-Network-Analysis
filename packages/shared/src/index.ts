@@ -16,6 +16,15 @@ export enum Permission {
   USER_MANAGE = 'user:manage',
   EVIDENCE_READ = 'evidence:read',
   EVIDENCE_WRITE = 'evidence:write',
+  INTELLIGENCE_READ = 'intelligence:read',
+  INTELLIGENCE_WRITE = 'intelligence:write',
+  INTELLIGENCE_AUTHORIZE = 'intelligence:authorize',
+  SOURCE_FINANCIAL = 'source:financial',
+  SOURCE_CDR = 'source:cdr',
+  SOURCE_CRIMINAL_HISTORY = 'source:criminal-history',
+  SOURCE_VEHICLE = 'source:vehicle',
+  SOURCE_LOCATION = 'source:location',
+  SOURCE_CYBER = 'source:cyber',
 }
 
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
@@ -25,12 +34,29 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.CASE_UPDATE,
     Permission.EVIDENCE_READ,
     Permission.EVIDENCE_WRITE,
+    Permission.INTELLIGENCE_READ,
+    Permission.INTELLIGENCE_WRITE,
+    Permission.SOURCE_FINANCIAL,
+    Permission.SOURCE_CDR,
+    Permission.SOURCE_CRIMINAL_HISTORY,
+    Permission.SOURCE_VEHICLE,
+    Permission.SOURCE_LOCATION,
+    Permission.SOURCE_CYBER,
   ],
   [UserRole.SUPERVISOR]: [
     Permission.CASE_CREATE,
     Permission.CASE_READ,
     Permission.CASE_UPDATE,
     Permission.CASE_ASSIGN,
+    Permission.INTELLIGENCE_READ,
+    Permission.INTELLIGENCE_WRITE,
+    Permission.INTELLIGENCE_AUTHORIZE,
+    Permission.SOURCE_FINANCIAL,
+    Permission.SOURCE_CDR,
+    Permission.SOURCE_CRIMINAL_HISTORY,
+    Permission.SOURCE_VEHICLE,
+    Permission.SOURCE_LOCATION,
+    Permission.SOURCE_CYBER,
     Permission.EVIDENCE_READ,
     Permission.EVIDENCE_WRITE,
   ],
@@ -75,6 +101,11 @@ export enum AuditAction {
   USER_UPDATE = 'user_update',
   AUDIT_READ = 'audit_read',
   ACCESS_DENIED = 'access_denied',
+  INTELLIGENCE_ANALYZE = 'intelligence_analyze',
+  INTELLIGENCE_READ = 'intelligence_read',
+  INTELLIGENCE_REVIEW = 'intelligence_review',
+  INTELLIGENCE_REQUEST_CREATE = 'intelligence_request_create',
+  INTELLIGENCE_TRANSITION = 'intelligence_transition',
 }
 
 export enum AuditResourceType {
@@ -84,6 +115,8 @@ export enum AuditResourceType {
   EVIDENCE = 'evidence',
   AUDIT = 'audit',
   SESSION = 'session',
+  INTELLIGENCE_GAP = 'intelligence_gap',
+  INTELLIGENCE_REQUEST = 'intelligence_request',
 }
 
 // ─── Evidence Store ────────────────────────────────────────────────────────
@@ -283,3 +316,33 @@ export interface PaginatedResponse<T> {
   page: number;
   pageSize: number;
 }
+
+// Phase 3 API contracts. Security CaseClassification is intentionally unchanged.
+export type IntelligenceGapStatus = 'OPEN' | 'REVIEWED' | 'DISMISSED' | 'REQUESTED' | 'RESOLVED' | 'STALE';
+export type IntelligencePriority = 'HIGH' | 'MEDIUM' | 'LOW';
+export type IntelligenceRequestStatus = 'DRAFT' | 'SUBMITTED' | 'PENDING_AUTHORIZATION' | 'AUTHORIZED' | 'REJECTED' | 'DISPATCHED' | 'RECEIVED' | 'COMPLETED' | 'FAILED';
+export interface IntelligenceSourceDto {
+  id: string; department: string; category: string; permission: string; synthetic: boolean;
+}
+export interface IntelligenceGapDto {
+  id: string; caseId: string; caseType: string; ruleId: string;
+  requiredData: string; targetType: string; targetEntity: string; sourceId: string;
+  source: IntelligenceSourceDto; timeFrom: string; timeTo: string; purpose: string;
+  priority: IntelligencePriority; priorityReason: string; explanation: string; status: IntelligenceGapStatus;
+  reviewedById: string | null; reviewedAt: string | null; reviewNote: string | null;
+  origins: Array<{ id: string; documentId: string; evidenceRecordId: string | null; mentionId: string | null; snapshot: unknown }>;
+  createdAt: string; updatedAt: string;
+}
+export interface IntelligenceRequestScope {
+  caseType: string; requiredData: string; targetType: string; targetEntity: string; sourceId: string;
+  timeFrom: string; timeTo: string; purpose: string; explanation: string;
+  priority: string; priorityReason: string; reviewedById: string; reviewedAt: string; origins: unknown[];
+}
+export interface IntelligenceRequestDto {
+  id: string; caseId: string; gapId: string; sourceId: string; scope: IntelligenceRequestScope;
+  status: IntelligenceRequestStatus; createdById: string; failureReason: string | null;
+  createdAt: string; updatedAt: string;
+}
+export interface ReviewIntelligenceGapRequest { decision: 'select' | 'dismiss'; note: string }
+export interface CreateIntelligenceRequest { gapId: string }
+export interface AuthorizeIntelligenceRequest { approved: boolean; reason: string }

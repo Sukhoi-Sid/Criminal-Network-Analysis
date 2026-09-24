@@ -1,5 +1,18 @@
 # Phase 2 Status — FIR & Document Intelligence
 
+## Verification and integration update — 2026-09-17
+
+All 13 Phase 2 baseline tests, including real PDF ingestion, passed against PostgreSQL before Phase 3 work.
+Earlier missing-client/build limitations below are historical. Phase 3 reuses the same processors and mention extractor.
+The only document-pipeline extensions are cached extracted pages for case context and an ISO-date matcher.
+Legacy completed documents receive a page cache through the existing processor without replacing their mentions.
+
+A later regression run exposed the bundled PDF parser's handling of Node Buffer views (`bad XRef entry`).
+Passing an owned Uint8Array to the existing parser fixes this without changing dependencies.
+PDF text now retains visual line boundaries, preserving labeled mentions and incident windows for Phase 3.
+The seed path registers the existing case-intelligence-state subscriber, just as API startup does.
+See [Phase 3 status](PHASE-3-STATUS.md) for final verification and the multiline PDF integration test.
+
 ## What's implemented
 
 | Area | Files |

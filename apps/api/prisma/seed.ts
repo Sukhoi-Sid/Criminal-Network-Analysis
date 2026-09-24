@@ -5,6 +5,8 @@ import { prisma } from '../src/core/db';
 import { hashPassword } from '../src/modules/auth/password';
 import { evidenceStoreService } from '../src/modules/evidence-store/evidence.service';
 import { documentIntelligenceService } from '../src/modules/document-intelligence/mention.service';
+import { seedPhase3Demo } from './phase3-demo';
+import { registerCaseIntelligenceStateSubscriber } from '../src/modules/case-platform/intelligence-state.subscriber';
 
 const DEMO_PASSWORD = 'Passw0rd!2026';
 
@@ -18,6 +20,7 @@ async function upsertUser(email: string, name: string, role: 'investigator' | 's
 }
 
 async function main() {
+  registerCaseIntelligenceStateSubscriber();
   console.log('Seeding demo data...');
 
   const investigator = await upsertUser('investigator@ncrb.demo', 'Investigator Rao', 'investigator');
@@ -82,6 +85,9 @@ async function main() {
   } else {
     console.log('Synthetic FIR already uploaded for this case, skipping.');
   }
+
+  const scenarios = await seedPhase3Demo(investigator, supervisor);
+  for (const scenario of scenarios) console.log(`Phase 3 demo ${scenario.case.caseId}: ${scenario.gaps.length} explainable gaps`);
 
   console.log('\nSeed complete. Demo credentials (all use the same password):');
   console.log(`  Password: ${DEMO_PASSWORD}`);

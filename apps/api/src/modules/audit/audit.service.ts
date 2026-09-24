@@ -1,6 +1,7 @@
 import { AuditAction, AuditResourceType } from '@sih/shared';
 import type { AuditAction as PrismaAuditAction, AuditResourceType as PrismaAuditResourceType } from '@prisma/client';
 import { prisma } from '../../core/db';
+import { Prisma } from '@prisma/client';
 
 export interface EmitAuditEventInput {
   actorId?: string | null;
@@ -26,8 +27,8 @@ export interface AuditQueryOptions {
  * operations are exposed. Every module that mutates state should call `emit`.
  */
 export class AuditService {
-  async emit(input: EmitAuditEventInput): Promise<void> {
-    await prisma.auditEvent.create({
+  async emit(input: EmitAuditEventInput, db: Prisma.TransactionClient = prisma): Promise<void> {
+    await db.auditEvent.create({
       data: {
         actorId: input.actorId ?? null,
         actorEmail: input.actorEmail ?? null,
@@ -35,7 +36,9 @@ export class AuditService {
         resourceType: input.resourceType as unknown as PrismaAuditResourceType,
         resourceId: input.resourceId ?? null,
         caseId: input.caseId ?? null,
-        metadata: input.metadata ?? undefined,
+        metadata: input.metadata
+  ? (input.metadata as Prisma.InputJsonValue)
+  : undefined,
         ipAddress: input.ipAddress ?? null,
       },
     });
