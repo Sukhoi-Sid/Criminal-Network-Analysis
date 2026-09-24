@@ -15,8 +15,12 @@ import type {
   CaseDto,
   CaseStatus,
   DocumentDto,
+  DocumentProcessingStatus,
   EvidenceRecordDto,
   EvidenceSourceType,
+  ExtractionMethod,
+  MentionDto,
+  MentionType,
   ProvenanceDto,
   ReliabilityTier,
   UserDto,
@@ -127,6 +131,9 @@ export function toDocumentDto(d: {
   sourceType: string;
   uploadedById: string;
   createdAt: Date;
+  processingStatus: string;
+  processingError: string | null;
+  processedAt: Date | null;
 }): DocumentDto {
   return {
     id: d.id,
@@ -137,6 +144,41 @@ export function toDocumentDto(d: {
     sourceType: d.sourceType as EvidenceSourceType,
     uploadedById: d.uploadedById,
     createdAt: d.createdAt.toISOString(),
+    processingStatus: d.processingStatus as DocumentProcessingStatus,
+    processingError: d.processingError,
+    processedAt: d.processedAt ? d.processedAt.toISOString() : null,
+  };
+}
+
+export function toMentionDto(m: {
+  id: string;
+  caseId: string;
+  documentId: string;
+  evidenceRecordId: string | null;
+  mentionType: string;
+  text: string;
+  normalizedText: string | null;
+  confidence: number;
+  pageNumber: number | null;
+  startOffset: number | null;
+  endOffset: number | null;
+  extractionMethod: string;
+  extractedAt: Date;
+}): MentionDto {
+  return {
+    id: m.id,
+    caseId: m.caseId,
+    documentId: m.documentId,
+    evidenceRecordId: m.evidenceRecordId,
+    mentionType: m.mentionType as MentionType,
+    text: m.text,
+    normalizedText: m.normalizedText,
+    confidence: m.confidence,
+    pageNumber: m.pageNumber,
+    startOffset: m.startOffset,
+    endOffset: m.endOffset,
+    extractionMethod: m.extractionMethod as ExtractionMethod,
+    extractedAt: m.extractedAt.toISOString(),
   };
 }
 

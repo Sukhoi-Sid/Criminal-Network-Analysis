@@ -7,9 +7,13 @@ import { authRouter } from './modules/auth/auth.routes';
 import { auditRouter } from './modules/audit/audit.routes';
 import { caseRouter } from './modules/case-platform/case.routes';
 import { evidenceRouter } from './modules/evidence-store/evidence.routes';
+import { mentionRouter } from './modules/document-intelligence/mention.routes';
+import { registerCaseIntelligenceStateSubscriber } from './modules/case-platform/intelligence-state.subscriber';
 import { errorMiddleware } from './middleware/error.middleware';
 
 export function createApp(): Express {
+  registerCaseIntelligenceStateSubscriber();
+
   const app = express();
 
   app.use(cors({ origin: env.WEB_ORIGIN, credentials: true }));
@@ -34,6 +38,9 @@ export function createApp(): Express {
   // evidence-store mounts its own /cases/:caseId/documents + /documents/:id +
   // /evidence-records/:id paths under this prefix.
   app.use('/api', evidenceRouter);
+  // document-intelligence mounts /cases/:caseId/documents/:documentId/process
+  // + /mentions under the same prefix.
+  app.use('/api', mentionRouter);
 
   // Must be registered last — express-async-errors forwards thrown/rejected
   // errors from async route handlers here.

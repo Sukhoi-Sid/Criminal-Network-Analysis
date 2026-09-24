@@ -78,6 +78,7 @@ model Case {
   intelligenceState    CaseIntelligenceState?
   documents            Document[]
   evidenceRecords      EvidenceRecord[]
+  mentions             Mention[]
   auditEvents          AuditEvent[]
 
   @@map("cases")
@@ -123,6 +124,7 @@ enum AuditAction {
   case_assign
   evidence_document_create
   evidence_document_read
+  document_process
   user_create
   user_update
   audit_read
@@ -190,7 +192,15 @@ model Document {
   uploadedBy      User               @relation(fields: [uploadedById], references: [id])
   createdAt       DateTime           @default(now())
 
+  // Phase 2 — document-intelligence processing state. Lives on Document
+  // (not a separate 1:1 table) since it's simple per-document state, not an
+  // independent entity with its own lifecycle beyond the document's.
+  processingStatus DocumentProcessingStatus @default(pending)
+  processingError  String?
+  processedAt      DateTime?
+
   evidenceRecords EvidenceRecord[]
+  mentions        Mention[]
 
   @@index([caseId])
   @@map("documents")
@@ -209,6 +219,7 @@ model EvidenceRecord {
   createdAt        DateTime           @default(now())
 
   provenance       Provenance?
+  mentions         Mention[]
 
   @@index([caseId])
   @@map("evidence_records")
@@ -231,4 +242,60 @@ model Provenance {
   integrityAnchorId    String?
 
   @@map("provenance_records")
+}
+
+// ─── Document Intelligence (Phase 2) — derived, NOT source of truth ───────
+// See docs/architecture/SYSTEM-ARCHITECTURE.md §3: Evidence Store above
+// remains authoritative; Mention is "a raw extracted reference before
+// resolution" (§12). Entity Resolution (Phase 4) is out of scope here.
+
+enum DocumentProcessingStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
+enum MentionType {
+  person
+  phone
+  vehicle
+  location
+  organization
+  case_identifier
+  date
+  money
+}
+
+enum ExtractionMethod {
+  regex
+  llm
+}
+
+// One row per extracted mention. `caseId` is denormalized from `document`
+// for cheap case-scoped queries/ABAC without an extra join, matching the
+// same pattern already used on EvidenceRecord/AuditEvent.
+model Mention {
+  id               String            @id @default(uuid())
+  caseId           String
+  case             Case              @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  documentId       String
+  document         Document          @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  evidenceRecordId String?
+  evidenceRecord   EvidenceRecord?   @relation(fields: [evidenceRecordId], references: [id])
+
+  mentionType      MentionType
+  text             String
+  normalizedText   String?
+  confidence       Float
+  pageNumber       Int?
+  startOffset      Int?
+  endOffset        Int?
+  extractionMethod ExtractionMethod  @default(regex)
+  extractedAt      DateTime          @default(now())
+
+  @@index([caseId])
+  @@index([documentId])
+  @@index([mentionType])
+  @@map("mentions")
 }

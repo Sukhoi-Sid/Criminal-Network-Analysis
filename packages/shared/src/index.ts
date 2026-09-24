@@ -70,6 +70,7 @@ export enum AuditAction {
   CASE_ASSIGN = 'case_assign',
   EVIDENCE_DOCUMENT_CREATE = 'evidence_document_create',
   EVIDENCE_DOCUMENT_READ = 'evidence_document_read',
+  DOCUMENT_PROCESS = 'document_process',
   USER_CREATE = 'user_create',
   USER_UPDATE = 'user_update',
   AUDIT_READ = 'audit_read',
@@ -99,6 +100,34 @@ export enum ReliabilityTier {
   TIER2_OPERATIONAL = 'tier2_operational',
   TIER3_DERIVED = 'tier3_derived',
   TIER4_UNVERIFIED = 'tier4_unverified',
+}
+
+// ─── Document Intelligence (Phase 2) ──────────────────────────────────────
+// Derived, NOT source of truth — see docs/architecture/SYSTEM-ARCHITECTURE.md
+// §3. Evidence (above) remains authoritative; mentions are extracted,
+// pending-resolution references to it.
+
+export enum DocumentProcessingStatus {
+  PENDING = 'pending',
+  PROCESSING = 'processing',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+}
+
+export enum MentionType {
+  PERSON = 'person',
+  PHONE = 'phone',
+  VEHICLE = 'vehicle',
+  LOCATION = 'location',
+  ORGANIZATION = 'organization',
+  CASE_IDENTIFIER = 'case_identifier',
+  DATE = 'date',
+  MONEY = 'money',
+}
+
+export enum ExtractionMethod {
+  REGEX = 'regex',
+  LLM = 'llm',
 }
 
 // ─── API DTOs ──────────────────────────────────────────────────────────────
@@ -187,6 +216,9 @@ export interface DocumentDto {
   sourceType: EvidenceSourceType;
   uploadedById: string;
   createdAt: string;
+  processingStatus: DocumentProcessingStatus;
+  processingError: string | null;
+  processedAt: string | null;
 }
 
 export interface EvidenceRecordDto {
@@ -209,6 +241,34 @@ export interface ProvenanceDto {
   transformationChain: unknown[];
   parentEvidenceId: string | null;
   contentHash: string;
+}
+
+// A raw, un-resolved reference extracted from a document — "Mention" per
+// docs/architecture/SYSTEM-ARCHITECTURE.md §12 ("raw extracted reference
+// before resolution"). Never authoritative; always traceable to its source
+// document/evidence record + location. Entity Resolution (Phase 4) is what
+// eventually turns these into InvestigativeEntity records — Phase 2 stops here.
+export interface MentionDto {
+  id: string;
+  caseId: string;
+  documentId: string;
+  evidenceRecordId: string | null;
+  mentionType: MentionType;
+  text: string;
+  normalizedText: string | null;
+  confidence: number;
+  pageNumber: number | null;
+  startOffset: number | null;
+  endOffset: number | null;
+  extractionMethod: ExtractionMethod;
+  extractedAt: string;
+}
+
+export interface ProcessDocumentResponse {
+  document: DocumentDto;
+  mentions: MentionDto[];
+  /** true if a cached COMPLETED result was returned without re-extracting (idempotency). */
+  reused: boolean;
 }
 
 export interface ApiError {
